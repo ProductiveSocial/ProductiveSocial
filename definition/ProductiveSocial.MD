@@ -5,8 +5,10 @@ ___
 
 The goal with Productive Social (PS) is to solve a personal problem I have, where there’s a lot of amazing apps to help with specific aspects of self-productivity and self-management, apps that help with goal tracking, apps that help with task management, and apps for journaling (an important aspect of productivity), but there’s no one app that does it all in a completely full feature-pledged way.
 There are some Apps that focus on more than one aspect of productivity, a good example is ***Notion***. 
+
 ### A simple overview on Notion and other apps
 The ability to design unlimited designs for notion pages; pages for journaling, pages for goals setting/habit tracking, pages for general management and others, is from my point-of-view the main thing that made _notion_ so popular. It gave people an all-in-one platform for management, journaling and databasing. It was then possible to replace a multitude of different apps with one.
+
 With _Productive Social_ we are following a similar pattern with focus on one of the problems I see with _Notion_. _Notion_ is a web app, threfor it cannot replace nor include all the features of a full-pledged mobile app, apps such as ***Habitica*** or ***Strides*** (nor does notion try to replace them).
 While _ ___Habitica___ (Gamifies habit building and goal tracking) and ___Strides___ (Goal setting, habit tracking, and progress monitoring)_ are amazing for doing what they are made for they don’t incorporate all the needs for productivity management, not in the same scale _Notion_ does, and Notion can’t offer the same value as of a dedicated mobile app.
 
@@ -25,6 +27,7 @@ One exciting use case of Productive Social:
             - With a task “Do mathematics homework before deadline day”
 
 ___Note__: Productive Social will include a pomodoro timer feature that can be set for any given task_
+
 When the user initiates the task _“Do mathematics homework before deadline day”_ the app should recommend initiating the pomodoro feature.
 In this scenario Productive Social is incorporating a ***task manager***, a ***habit building/goal tracking*** and a ***pomodoro*** app. 
 Supposedly it took the user 3 pomodoro to complete their math homework. Upon completion PS should build a report on the user progress on the goal “Be an A student”, an overall look on how the user has been performing on building the habit “Study every day” and intel retrieved from the Pomodoro feature on how the user has been performing. A short descriptive resume on the user performance on this given day should be presented to the user in the ***journaling*** feature.
@@ -73,6 +76,7 @@ ___
 6. AI support
     - Report genaration.
 ___
+
 
 
 
