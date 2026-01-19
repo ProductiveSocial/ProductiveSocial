@@ -13,7 +13,8 @@ reports and actionable recommendations.
    - Integration - it unifies goal and habit ecosystem, task management, note-taking and focus tools into a single workflow, ensuring no productivity data is lost.
    - Individualized ML - it utilizes a dedicated Machine Learning engine that learns from unique user data
    - Social accountability - it introduces a specialized social layer designed to drive retention through "proof of work" and shared milestones, allowing for studying of habit stacks and progress of high-performers.
- 
+   
+
 ## 2. Business Requirements
 #### 2.1 High-Levee Product Requirements
  - _Unified Productivity Suite_ - the platform must provide four core standalone modules - _Task Management, Note-taking, Pomodoro Timer and Journaling_ that function both independently and as a fully integrated ecosystem.
@@ -42,10 +43,10 @@ The ML model is not a separate feature but the connective tissue of the user exp
 
 #### Success Criteria
 While the app working as intended is the ultimate goal, we will measure success through these specific metrics:
- 1. ML Accuracy & Utility - The acceptance rate of ML-generated journal drafts should exceed 60%.
-    - the Prediction Error (difference between predicted tasks and actual user corrections) should decrease over a 30-day period as the model learns individual behavior.
- 2. User Retention - A measurable increase in Daily active users specifically driven by the Social Feed and desire to maintain Public productive blueprints.
- 3. Data Integrity - A seamless synchronization of data across all different app modules.
+1. ML Accuracy & Utility - The acceptance rate of ML-generated journal drafts should exceed 60%.
+   - the Prediction Error (difference between predicted tasks and actual user corrections) should decrease over a 30-day period as the model learns individual behavior.
+2. User Retention - A measurable increase in Daily active users specifically driven by the Social Feed and desire to maintain Public productive blueprints.
+3. Data Integrity - A seamless synchronization of data across all different app modules.
  
 ## 3. Project Scope
  - In-Scope:
@@ -68,27 +69,6 @@ While the app working as intended is the ultimate goal, we will measure success 
 | **Task**    | One-time discrete actions (e.g., "Install VS Code"). | Linked to a Goal or a specific Habit.                 |
 | **Session** | Metadata from the **Pomodoro Timer**.                | References a Task or Habit; provides "Proof of Work". |
 | **Journal** | The synthesis of all data for a specific date.       | Aggregates all Sessions, Habits, and Tasks.           |
-
-### 4.1 Data Hierarchy
-The system is built on a hierarchical data model to ensure the ML engine understands the intent behind every action.
-- Goals: The North Star (e.g., "Become a Senior Developer").
-- Habits: Recurring actions that support the goal (e.g., "Code for 2 hours daily").
-- Tasks: Discrete items supporting the goal (e.g., "Finish Chapter 4 of React docs").
-- Events: Pomodoro sessions or Journal logs that verify the work done.
-- 
-### 4.2 Data Scientist tasks
-1. Natural Language Summarization - Turning raw logs into a coherent daily journal narrative.
-2. Gap-Filler Logic - Predicting activity for days when the user didn't log in
-3. Anonymized Benchmarking Engine - Providing comparative analytics for the social feed.
-
-#### Horizon and Nature of Processing
-- _Analysis Horizon_ - Since the core function is the generation of a daily journal and productivity reports, the model operates in Near Real-Time. Generation triggers either at the end of a "Focus Session" or at a user-defined "Review Time" (e.g., 9:00 PM).
-- _Processing Granularity_ - The model works at the Individual User Level. Data from different users is strictly siloed to ensure privacy and personalized habit modeling.
-- _Justification_ - Productivity is highly subjective; a "good day" for a developer looks different from one for a student. Global models would fail to capture these nuances.
-
-#### Data Quality Assumptions
-_Textual Data_ - Notes and Journal entries are assumed to be "Structured-Unstructured" (Markdown/Text). We assume minimal OCR issues as data is entered digitally.
-_Goal Consistency_ - We assume that the user’s Goal & Habit Catalog is relatively stable. If a user changes goals daily, the ML’s predictive accuracy will decrease.
 
 #### Model Performance 
 _Inference Performance_ - Journal generation should take $\le$ 30 seconds to maintain a smooth UI experience.
@@ -115,4 +95,5 @@ To the train the predictive models, we'll utilize all the app features:
 | **Temporal**    | `activity_pattern`  | Event Logs    | Calculating "Peak Productivity Hours" (time of day vs. task completion).      |
 
 ## 6. Блок-схема решения
-TODO()
+  //Insert image here
+  
