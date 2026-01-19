@@ -97,3 +97,100 @@ To the train the predictive models, we'll utilize all the app features:
 ## 6. Блок-схема решения
   //Insert image here
   
+## The Stages of Solving the Problem
+
+### 1. Data Preparation Stages
+
+#### 1.1 Data Preparation
+For ProductiveSocial the necessary data for model pre-training are publicly available datasets about human productivity patterns.
+Most productivity datasets are biased toward office workers, so to mitigate this a diverse synthetic data representing students, freelancers and night-shift workers can be included.
+
+The primary categories of external data for pre-training:
+- Behavioral Logs: Datasets like the 90-Day Habit Tracker or Kaggle Time Management Insights. These provide correlations between sleep, exercise, and self-reported productivity. 
+- Proof of Work (Wearables): Fitbit Consumer/PMData datasets. These are used to train the model to recognize "active" vs. "sedentary" periods as proxies for focus. 
+- Textual Summaries: Publicly available journaling prompts and "Day-in-the-life" blogs (scraped from Reddit/Productivity forums) to teach the LLM the desired narrative style.
+
+The main source of data for the model should be user generated data.
+#### 1.2 Data Sourcing and Generation
+- External - Sourced from Kaggle and open-source lifelogging repositories (e.g., PMData)
+- Internal - On-device generated data from the app modules.
+- Synthetic - Usage of a LLM to generated synthetic productivity reports to boost the training set for the small on-device model.
+
+#### 1.3. Confidentiality & Privacy
+A local Named Entity Recognition (NER) layer should be used to strip phone numbers and specific locations before syncing user data.
+
+### 2. Model development and Personalization
+#### 2.1 Pre-training + Fine-tuning Strategy
+1. Global Pre-training: Train a Small Language Model (SLM) on external and synthetic data to understand the structure of a journal entry.
+2. On-Device Personalization (The Refinement): As the user edits their "Smart Journal," the model performs Low-Rank Adaptation (LoRA) locally. This adjusts the model's weights to match the user's specific vocabulary and goal-priority patterns.
+
+#### 2.2 ML Metrics
+- Loss Function - Weighted Cross-Entropy (prioritizing the correct identification of "Goal-related" tasks over "General" tasks).
+- Primary Metric - Edit Distance (Levenshtein). We measure the difference between the ML draft and the user's final version.Target: 
+  - Average Edit Distance should decrease by $15\%$ every month.
+
+#### 2.3 ML Validation Scheme
+We use a "User-Fold" Cross-Validation:
+- Train on 100 "Persona" types (simulated users). 
+- Test on 20 "Held-out" personas to ensure the model generalizes to different lifestyles before it even meets a real user.\
+
+#### 2.4 Baseline vs. Advanced Solution
+- Baseline - A rule-based system using string templates (e.g., "You finished 3 tasks today"). 
+- Advanced - The fine-tuned SLM that can infer sentiment (e.g., "Despite the long meetings, you maintained focus on the Python project").
+
+### 3. Inference and Model Optimization
+Since the goal is an "Offline-First" experience, we cannot rely on cloud GPUs. We must squeeze the model into the mobile device's RAM and CPU/NPU.
+
+#### 3.1 Model Quantization and Compression
+- To fit a Small Language Model (SLM) like Phi-3 or Gemma-2b on a phone, we must reduce its size. 
+- Technique: 4-bit Quantization (using GGML or bitsandbytes). This reduces a 5GB model to roughly 1.2GB - 1.8GB, making it viable for modern smartphones with 6GB+ RAM. 
+- Format: Convert models to TFLite (Android) or CoreML (iOS) to leverage hardware acceleration (NPU/GPU). 
+- Memory Footprint Calculation:
+    Memory ~= (Parameters * Bits)/8
+  - For a 2 billion parameters model ~= 1 GB of VRAM.
+
+#### 3.2 ML Execution Trigger Logic
+Running a generative model is resource-intensive so we define two triggers
+- Scheduled (Once every 24h) - At a user defined time or during night time when the user is presumably sleeping and the phone is charging.
+- On-demand - When the user manually prompts for a report.
+
+### 4. Business Rules
+The ML output must be filtered through "Business Rules" to ensure it remains helpful, safe, and aligned with the "Productive Social" philosophy.
+
+#### Rule 1
+if the model's confidence score for a generated task prediction is below 0.4, the system will not auto-fil the gap, instead it will prompt the user:
+"We noticed a gap in your log - did you work on (goal x) on (given day)?"
+#### Rule 2
+The ML must never suggest "deleting" a goal or habit. It can suggest on how to improve or adjust a goal. The ML system should be hard-coded to be a supportive coach, not a critical judge
+#### Rule 3
+Before the model generates a social "Success Blueprint," a rule-based layer ensures:
+Removal of all numerical identifiers (phone numbers, addresses).
+Replacement of specific project names with generic "Sector" tags (e.g., "Secret Project X" becomes "Software Development").
+
+### 5. Final Report and Business Metrics
+| Metric                | Target | Method of Measurement                                                         |
+|-----------------------|--------|-------------------------------------------------------------------------------|
+| User Effort Reduction | >50%   | Comparison of time spent writing a manual journal vs. editing an AI draft.    |
+| Inference Latency     | <15s   | P95 of time from "Trigger" to "Draft Displayed."                              |
+| Habit Retention       | +15%   | Success rate of users maintaining a 14-day streak vs. a non-ML control group. |
+
+### 6. Implementation and Production
+
+#### 8.1 Solution Architecture
+- Local Layer: Kotlin/Swift app utilizing TFLite/CoreML runtimes for inference.
+- Cloud Layer: GoLang microservices for social feed management and anonymized "Success Blueprint" storage.
+
+#### 8.2 Infrastructure & Scalability
+- Stack: AWS Lambda for lightweight metadata sync; PostgreSQL for social data.
+  - Why: Serverless architecture scales automatically and fits the "low-cost" requirement by only charging for active sync time.
+
+#### 8.3 Security & Data Privacy
+- GDPR Compliance: Users have a "Right to Erasure" (one-click wipe of local and remote data). No PII (Personally Identifiable Information) is sent to the cloud for ML processing.
+- NER Layer: Anonymizes text before social sharing to prevent accidental disclosure of project names or contact info.
+
+#### 8.4 Risks and Mitigation
+| Risk          | Impact | Mitigation Strategy                                                     |
+|---------------|--------|-------------------------------------------------------------------------|
+| Model Drift   | Medium | Periodic on-device re-tuning (LoRA) based on user edits.                |
+| Battery Drain | High   | Restrict heavy inference/training to when the device is charging.       |
+| Hallucination | High   | Use "Rule 1" (Confidence threshold) to avoid generating false activity. |
