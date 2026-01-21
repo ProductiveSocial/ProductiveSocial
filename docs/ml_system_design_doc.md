@@ -174,23 +174,3 @@ Replacement of specific project names with generic "Sector" tags (e.g., "Secret 
 | Inference Latency     | <15s   | P95 of time from "Trigger" to "Draft Displayed."                              |
 | Habit Retention       | +15%   | Success rate of users maintaining a 14-day streak vs. a non-ML control group. |
 
-### 6. Implementation and Production
-
-#### 8.1 Solution Architecture
-- Local Layer: Kotlin/Swift app utilizing TFLite/CoreML runtimes for inference.
-- Cloud Layer: GoLang microservices for social feed management and anonymized "Success Blueprint" storage.
-
-#### 8.2 Infrastructure & Scalability
-- Stack: AWS Lambda for lightweight metadata sync; PostgreSQL for social data.
-  - Why: Serverless architecture scales automatically and fits the "low-cost" requirement by only charging for active sync time.
-
-#### 8.3 Security & Data Privacy
-- GDPR Compliance: Users have a "Right to Erasure" (one-click wipe of local and remote data). No PII (Personally Identifiable Information) is sent to the cloud for ML processing.
-- NER Layer: Anonymizes text before social sharing to prevent accidental disclosure of project names or contact info.
-
-#### 8.4 Risks and Mitigation
-| Risk          | Impact | Mitigation Strategy                                                     |
-|---------------|--------|-------------------------------------------------------------------------|
-| Model Drift   | Medium | Periodic on-device re-tuning (LoRA) based on user edits.                |
-| Battery Drain | High   | Restrict heavy inference/training to when the device is charging.       |
-| Hallucination | High   | Use "Rule 1" (Confidence threshold) to avoid generating false activity. |
