@@ -95,7 +95,7 @@ To the train the predictive models, we'll utilize all the app features:
 | **Temporal**    | `activity_pattern`  | Event Logs    | Calculating "Peak Productivity Hours" (time of day vs. task completion).      |
 
 ## 6. Блок-схема решения
-  [//Блок-схема решения](https://drive.google.com/file/d/1d9CVSUS3K3sv02dq-EpMQfZmihcB6Cln/view?usp=sharing)
+  [Блок-схема решения](https://drive.google.com/file/d/1d9CVSUS3K3sv02dq-EpMQfZmihcB6Cln/view?usp=sharing)
   
 ## The Stages of Solving the Problem
 
