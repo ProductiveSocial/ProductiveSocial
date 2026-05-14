@@ -19,12 +19,29 @@ The core user-facing service. Manages:
 Exposes internal endpoints so `psocial_analytics` can pull per-user data.
 
 ### `psocial_timer` (Kotlin/Ktor, port 8081)
-Pomodoro focus session tracker. Records work/break cycles linked to tasks or habits. Exposes an internal endpoint so analytics can pull per-user stats.
+Pomodoro focus session tracker. Records work/break cycles linked to tasks, habits, or routines. Exposes an internal endpoint so analytics can pull per-user stats.
+
+**AI features built into the timer (Features 1–5):**
+- **Smart duration recommendations** — `GET /settings` returns a `recommended` block with personalised work/break durations based on actual completed interval history (min 5 work intervals required).
+- **Focus pattern insights** — `GET /insights/focus-patterns` returns completed work interval counts by hour-of-day (UTC) and day-of-week, plus peak hour and peak day.
+- **Abandonment prediction** — `PATCH /sessions/{id}/pause` response includes an `abandonmentRisk` field when the session's pause count reaches the user's historical abandon threshold, or the session has been open far longer than planned.
+- **Entity-specific analysis** — `GET /insights/entity-stats` returns session completion rates, avg work minutes, and avg cycles broken down by Task, Habit, Routine, and Standalone. Identifies strongest and weakest entity types.
+- **Adaptive break suggestions** — `POST /sessions/{id}/intervals/{intervalId}/complete` response includes a `suggestedNextBreak` field (ShortBreak, LongBreak, or ExtendedRest) whenever a Work interval is completed.
 
 ### `psocial_analytics` (Kotlin/Ktor, port 8082)
 AI analysis service. Pulls data from selfmanager and timer, sends it to billing for LLM inference, stores the resulting insight, and presents reports to users and admins.
 - Regular users can trigger analysis and read their own reports
 - Admins can view all users' reports and aggregate stats
+
+**Analysis types:**
+| Type | Description |
+|------|-------------|
+| `PRODUCTIVITY_SUMMARY` | Cross-service summary: tasks, habits, routines, focus sessions |
+| `TASK_PRIORITIZATION` | Prioritised focus list based on pending tasks and time spent |
+| `HABIT_INSIGHTS` | Habit consistency analysis and high-impact change suggestions |
+| `ROUTINE_OPTIMIZATION` | Routine efficiency review with concrete improvements |
+| `WEEKLY_TIMER_SUMMARY` | AI-generated weekly Pomodoro recap — focus time, completion rate, peak patterns, next-week suggestion |
+| `CUSTOM` | Free-form prompt |
 
 ### `psocial_billing_service` (Python/FastAPI, port 8001)
 Handles:
@@ -44,8 +61,10 @@ Handles:
 ### `psocial_user_dashboard` (Streamlit, port 8502)
 **User UI.** Login open to any registered user. Pages:
 - **Productivity** — view tasks, habits, and routines from selfmanager
-- **Focus** — pomodoro settings and session history from timer
-- **Analysis** — trigger AI analysis, view previous reports
+- **Focus** — two tabs:
+  - *Sessions* — Pomodoro settings, summary metrics, filterable session history
+  - *Insights* — recommended durations, focus pattern charts (by hour/day), entity completion rates, weekly summary generator
+- **Analysis** — trigger AI analysis (all types), view previous reports
 - **Credits** — current balance, email, and transaction history
 
 ---
@@ -60,7 +79,7 @@ docker-compose down         # stop all services
 docker-compose logs -f <service>  # tail logs for a service
 ```
 
-Each Kotlin service uses a multi-stage Dockerfile: Gradle build stage → `eclipse-temurin:17-jre` runtime.  
+Each Kotlin service uses a multi-stage Dockerfile: Gradle build stage → `eclipse-temurin:17-jre` runtime.
 Python services use `python:3.12-slim`.
 
 **Colima** is the recommended Docker runtime on macOS. Start with enough memory for Kotlin builds:
@@ -194,12 +213,12 @@ sequenceDiagram
 
 Each service owns its own PostgreSQL database. No shared tables — services only communicate via HTTP.
 
-| Service      | Container            | Host Port |
-|--------------|----------------------|-----------|
-| selfmanager  | psocial_selfmanager_db | 5432    |
-| billing      | psocial_billing_db   | 5433      |
-| timer        | psocial_timer_db     | 5434      |
-| analytics    | psocial_analytics_db | 5435      |
+| Service      | Container              | Host Port |
+|--------------|------------------------|-----------|
+| selfmanager  | psocial_selfmanager_db | 5432      |
+| billing      | psocial_billing_db     | 5433      |
+| timer        | psocial_timer_db       | 5434      |
+| analytics    | psocial_analytics_db   | 5435      |
 
 ---
 
@@ -210,19 +229,38 @@ All endpoints under `/api/v1/pomodoro` require a Bearer JWT.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/identify` | Find-or-create user, return JWT |
-| `GET` | `/api/v1/pomodoro/settings` | Get user's pomodoro settings |
+| `GET` | `/api/v1/pomodoro/settings` | Get user's pomodoro settings (includes `recommended` block) |
 | `PUT` | `/api/v1/pomodoro/settings` | Update pomodoro settings |
 | `POST` | `/api/v1/pomodoro/sessions` | Create a new focus session (auto-starts first Work interval) |
 | `GET` | `/api/v1/pomodoro/sessions` | List all sessions (optional `?entityType=Task&entityId=1`) |
 | `GET` | `/api/v1/pomodoro/sessions/{id}` | Get a specific session with all intervals |
 | `POST` | `/api/v1/pomodoro/sessions/{id}/intervals/start` | Start the next interval (Work → ShortBreak → LongBreak) |
-| `POST` | `/api/v1/pomodoro/sessions/{id}/intervals/{intervalId}/complete` | Mark an interval as completed |
-| `PATCH` | `/api/v1/pomodoro/sessions/{id}/pause` | Pause an active session |
+| `POST` | `/api/v1/pomodoro/sessions/{id}/intervals/{intervalId}/complete` | Mark an interval as completed (returns `suggestedNextBreak`) |
+| `PATCH` | `/api/v1/pomodoro/sessions/{id}/pause` | Pause an active session (returns `abandonmentRisk`) |
 | `PATCH` | `/api/v1/pomodoro/sessions/{id}/resume` | Resume a paused session |
 | `PATCH` | `/api/v1/pomodoro/sessions/{id}/complete` | Mark session as completed |
 | `DELETE` | `/api/v1/pomodoro/sessions/{id}/abandon` | Abandon a session |
 | `POST` | `/api/v1/pomodoro/sync` | Sync offline sessions from KMP clients |
+| `GET` | `/api/v1/pomodoro/insights/focus-patterns` | Completed work intervals by hour-of-day and day-of-week |
+| `GET` | `/api/v1/pomodoro/insights/entity-stats` | Session completion rates broken down by entity type |
 | `GET` | `/internal/users/{id}/stats` | Aggregated stats for analytics (X-Internal-Key) |
+
+---
+
+## Analytics Endpoints
+
+User endpoints require a selfmanager/timer Bearer JWT. Admin endpoints additionally require the caller's email to be in the `ADMIN_EMAILS` env var. Internal endpoints require `X-Internal-Key`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/analytics` | Trigger LLM analysis (pulls selfmanager + timer data, charges credits, stores report) |
+| `GET` | `/api/v1/analytics` | List the authenticated user's stored reports (newest first) |
+| `GET` | `/api/v1/admin/stats` | Totals: users, reports, credits charged, breakdown by analysis type |
+| `GET` | `/api/v1/admin/users` | All users with report counts |
+| `GET` | `/api/v1/admin/reports` | All reports across all users |
+| `GET` | `/api/v1/admin/users/{userId}/reports` | All reports for a specific user |
+| `DELETE` | `/api/v1/admin/users/{userId}/reports` | Delete all reports for a specific user |
+| `GET` | `/internal/users/{userId}/stats` | Internal: user report stats for service-to-service use (X-Internal-Key) |
 
 ---
 
@@ -254,41 +292,6 @@ Auth and user endpoints are unauthenticated or require a billing Bearer JWT. Int
 | `PATCH` | `/api/v1/admin/users/{id}/toggle-active` | Activate or deactivate a user |
 | `GET` | `/api/v1/admin/predictions` | All predictions system-wide |
 | `GET` | `/api/v1/admin/analytics` | System totals: users, predictions, credits charged/deposited, active models |
-
----
-
-## End-to-End User Journey
-
-Full flow for a new user from registration through productivity analysis.
-
-| Step | Service | Action | Result |
-|------|---------|--------|--------|
-| 1 | selfmanager | `POST /api/v1/auth/identify` with email | User created, JWT issued |
-| 2 | selfmanager | `POST /api/v1/sync` with project + tasks + habits + routines | All entities created, server IDs returned via `idMappings` |
-| 3 | timer | `POST /api/v1/auth/identify` | Timer JWT issued |
-| 3 | timer | `POST /api/v1/pomodoro/sessions` + complete intervals | Focus sessions logged |
-| 4 | billing | `POST /api/v1/auth/identify` | Billing account created, 100 welcome credits deposited |
-| 4 | billing | `POST /api/v1/users/me/link-selfmanager` | Billing account linked to selfmanager user ID (done automatically on dashboard login) |
-| 5 | analytics | `POST /api/v1/analytics` | Pulls tasks/habits/routines + pomodoro stats, sends to billing LLM, stores insight |
-| 6 | analytics | `GET /api/v1/analytics` | User reads their stored reports |
-| 6 | billing | `GET /api/v1/users/me/transactions` | User sees credit charges and current balance |
-
----
-
-## Analytics Endpoints
-
-User endpoints require a selfmanager/timer Bearer JWT. Admin endpoints additionally require the caller's email to be in the `ADMIN_EMAILS` env var. Internal endpoints require `X-Internal-Key`.
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/analytics` | Trigger LLM analysis (pulls selfmanager + timer data, charges credits, stores report) |
-| `GET` | `/api/v1/analytics` | List the authenticated user's stored reports (newest first) |
-| `GET` | `/api/v1/admin/stats` | Totals: users, reports, credits charged, breakdown by analysis type |
-| `GET` | `/api/v1/admin/users` | All users with report counts |
-| `GET` | `/api/v1/admin/reports` | All reports across all users |
-| `GET` | `/api/v1/admin/users/{userId}/reports` | All reports for a specific user |
-| `DELETE` | `/api/v1/admin/users/{userId}/reports` | Delete all reports for a specific user |
-| `GET` | `/internal/users/{userId}/stats` | Internal: user report stats for service-to-service use (X-Internal-Key) |
 
 ---
 
@@ -329,6 +332,22 @@ Auth endpoints are unauthenticated. All data endpoints require a Bearer JWT — 
 
 ---
 
+## End-to-End User Journey
+
+| Step | Service | Action | Result |
+|------|---------|--------|--------|
+| 1 | selfmanager | `POST /api/v1/auth/identify` with email | User created, JWT issued |
+| 2 | selfmanager | `POST /api/v1/sync` with project + tasks + habits + routines | All entities created, server IDs returned via `idMappings` |
+| 3 | timer | `POST /api/v1/auth/identify` | Timer JWT issued |
+| 3 | timer | `POST /api/v1/pomodoro/sessions` + complete intervals | Focus sessions logged |
+| 4 | billing | `POST /api/v1/auth/identify` | Billing account created, 100 welcome credits deposited |
+| 4 | billing | `POST /api/v1/users/me/link-selfmanager` | Billing account linked to selfmanager user ID (done automatically on dashboard login) |
+| 5 | analytics | `POST /api/v1/analytics` | Pulls tasks/habits/routines + pomodoro stats, sends to billing LLM, stores insight |
+| 6 | analytics | `GET /api/v1/analytics` | User reads their stored reports |
+| 6 | billing | `GET /api/v1/users/me/transactions` | User sees credit charges and current balance |
+
+---
+
 ## ML Models — sklearn (.pkl) vs LLM
 
 The billing service supports two model types: `llm` and `sklearn`. Here's why they serve different purposes.
@@ -357,7 +376,7 @@ Once real user data accumulates, sklearn models become useful for narrower, well
 
 These require **months of real user data** before they produce meaningful results.
 
-### Current approach — LLM via Ollama
+### Current approach — LLM via Ollama/Claude
 
 LLMs handle open-ended productivity analysis without labeled datasets. The billing service calls a local Ollama instance (or Anthropic/OpenAI), passing structured user data as context and returning natural language insights.
 

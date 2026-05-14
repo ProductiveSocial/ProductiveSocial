@@ -1,0 +1,270 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PSocial — full stack
+#
+# Services:
+#   selfmanager_db  :5432  — PostgreSQL for psocial_selfmanager
+#   timer_db        :5434  — PostgreSQL for psocial_timer
+#   billing_db      :5433  — PostgreSQL for psocial_billing_service
+#   analytics_db    :5435  — PostgreSQL for psocial_analytics
+#   selfmanager     :8080  — Ktor self-manager API
+#   timer           :8081  — Ktor Pomodoro timer API
+#   analytics       :8082  — Ktor analytics API
+#   billing         :8001  — FastAPI billing + ML/LLM service
+#   dashboard       :8501  — Streamlit admin dashboard
+#   user_dashboard  :8502  — Streamlit user dashboard
+#
+# Start: docker-compose up --build
+# Stop:  docker-compose down
+# Logs:  docker-compose logs -f <service>
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-jwt: &jwt
+  JWT_SECRET: your-super-secret-jwt-secret-key-change-in-production
+  JWT_ISSUER: ktor-psocial-app
+  JWT_AUDIENCE: ktor-psocial
+  JWT_REALM: ktor-psocial
+
+x-internal: &internal
+  INTERNAL_API_KEY: psocial-internal-secret
+
+services:
+
+  # ── Databases ───────────────────────────────────────────────────────────────
+
+  selfmanager_db:
+    image: postgres:16-alpine
+    container_name: psocial_selfmanager_db
+    environment:
+      POSTGRES_DB: psocial_selfmanager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ""
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - selfmanager_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - psocial_network
+
+  timer_db:
+    image: postgres:16-alpine
+    container_name: psocial_timer_db
+    environment:
+      POSTGRES_DB: psocial_timer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ""
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5434:5432"
+    volumes:
+      - timer_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - psocial_network
+
+  billing_db:
+    image: postgres:16-alpine
+    container_name: psocial_billing_db
+    environment:
+      POSTGRES_DB: psocial_billing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ""
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - billing_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - psocial_network
+
+  analytics_db:
+    image: postgres:16-alpine
+    container_name: psocial_analytics_db
+    environment:
+      POSTGRES_DB: psocial_analytics
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ""
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5435:5432"
+    volumes:
+      - analytics_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - psocial_network
+
+  # ── Application services ────────────────────────────────────────────────────
+
+  selfmanager:
+    image: productivesocial-selfmanager
+    container_name: psocial_selfmanager
+    ports:
+      - "8080:8080"
+    environment:
+      <<: [*jwt, *internal]
+      DATABASE_URL: jdbc:postgresql://selfmanager_db:5432/psocial_selfmanager
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 8080
+      HOST: 0.0.0.0
+      BILLING_SERVICE_URL: http://billing:8001
+      TIMER_SERVICE_URL: http://timer:8081
+      ALLOWED_ORIGINS: "*"
+      USER_REGISTRY_DB_HOST: selfmanager_db
+      USER_REGISTRY_DB_PORT: 5432
+      USER_REGISTRY_DB_NAME: psocial_selfmanager
+      USER_REGISTRY_DB_USER: postgres
+      USER_REGISTRY_DB_PASSWORD: ""
+    depends_on:
+      selfmanager_db:
+        condition: service_healthy
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+  timer:
+    image: productivesocial-timer
+    container_name: psocial_timer
+    ports:
+      - "8081:8081"
+    environment:
+      <<: [*jwt, *internal]
+      DATABASE_URL: jdbc:postgresql://timer_db:5432/psocial_timer
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 8081
+      HOST: 0.0.0.0
+      SERVICES_SERVICE_URL: http://selfmanager:8080
+      ALLOWED_ORIGINS: "*"
+      USER_REGISTRY_DB_HOST: selfmanager_db
+      USER_REGISTRY_DB_PORT: 5432
+      USER_REGISTRY_DB_NAME: psocial_selfmanager
+      USER_REGISTRY_DB_USER: postgres
+      USER_REGISTRY_DB_PASSWORD: ""
+    depends_on:
+      timer_db:
+        condition: service_healthy
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+  analytics:
+    image: productivesocial-analytics
+    container_name: psocial_analytics
+    ports:
+      - "8082:8082"
+    environment:
+      <<: [*jwt, *internal]
+      DATABASE_URL: jdbc:postgresql://analytics_db:5432/psocial_analytics
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PORT: 8082
+      HOST: 0.0.0.0
+      BILLING_SERVICE_URL: http://billing:8001
+      SELFMANAGER_SERVICE_URL: http://selfmanager:8080
+      TIMER_SERVICE_URL: http://timer:8081
+      ALLOWED_ORIGINS: "*"
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    depends_on:
+      analytics_db:
+        condition: service_healthy
+      billing:
+        condition: service_started
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+  billing:
+    image: productivesocial-billing
+    container_name: psocial_billing_service
+    ports:
+      - "8001:8001"
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@billing_db:5432/psocial_billing
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@billing_db:5432/psocial_billing
+      JWT_SECRET_KEY: your-super-secret-jwt-secret-key-change-in-production
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      INTERNAL_API_KEY: psocial-internal-secret
+      SELFMANAGER_BASE_URL: http://selfmanager:8080
+      DEFAULT_CREDITS_ON_REGISTER: 100
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEFAULT_LLM_PROVIDER: anthropic
+    volumes:
+      - billing_models:/app/models_store
+    depends_on:
+      billing_db:
+        condition: service_healthy
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+  dashboard:
+    image: productivesocial-dashboard
+    container_name: psocial_dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      BILLING_URL: http://billing:8001
+      SELFMANAGER_URL: http://selfmanager:8080
+      ANALYTICS_URL: http://analytics:8082
+    depends_on:
+      - billing
+      - selfmanager
+      - analytics
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+  user_dashboard:
+    image: productivesocial-user-dashboard
+    container_name: psocial_user_dashboard
+    ports:
+      - "8502:8502"
+    environment:
+      BILLING_URL: http://billing:8001
+      SELFMANAGER_URL: http://selfmanager:8080
+      ANALYTICS_URL: http://analytics:8082
+      TIMER_URL: http://timer:8081
+    depends_on:
+      - billing
+      - selfmanager
+      - analytics
+      - timer
+    networks:
+      - psocial_network
+    restart: unless-stopped
+
+networks:
+  psocial_network:
+    name: psocial_network
+    driver: bridge
+
+volumes:
+  selfmanager_db_data:
+  timer_db_data:
+  billing_db_data:
+  analytics_db_data:
+  billing_models:
