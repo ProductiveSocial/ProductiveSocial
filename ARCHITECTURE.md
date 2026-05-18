@@ -71,45 +71,302 @@ Handles:
 
 ## Build Steps
 
-### Kotlin Services (selfmanager, timer, analytics)
+### Prerequisites
 
-Each Kotlin service must be compiled into a fat JAR before its Docker image can be built.
+| Tool | Version | Notes |
+|------|---------|-------|
+| JDK | 17+ | `eclipse-temurin:17` in Docker; `java -version` to check |
+| Gradle | 9.3 (wrapper) | Use `./gradlew` — no global install needed |
+| Python | 3.12+ | For billing and dashboards |
+| Docker | any recent | Docker Desktop or Colima on macOS |
+| Ollama | any | Required for local LLM inference |
 
+**Colima (macOS)** — start with enough resources for Kotlin builds:
 ```bash
-# selfmanager
-cd psocial_selfmanager && ./gradlew :server:shadowJar
-
-# timer
-cd psocial_timer && ./gradlew :server:shadowJar
-
-# analytics
-cd psocial_analytics && ./gradlew :server:shadowJar
+colima start --memory 6 --cpu 4
 ```
 
-Output: `server/build/libs/server-all.jar` (picked up by the Dockerfile)
+**Ollama** — pull the default model:
+```bash
+ollama pull llama3.2
+```
 
-### Build Docker Images
+---
+
+### 1. psocial_selfmanager (Kotlin/Ktor :1226)
 
 ```bash
-# Kotlin services
-docker build -t productivesocial-selfmanager ./psocial_selfmanager
-docker build -t productivesocial-timer ./psocial_timer
-docker build -t productivesocial-analytics ./psocial_analytics
+cd psocial_selfmanager
 
-# Python services
-docker build -t productivesocial-billing ./psocial_billing
-docker build -t productivesocial-dashboard ./psocial_dashboard
+# Compile fat JAR
+./gradlew :server:shadowJar
+# Output: server/build/libs/server-all.jar
+
+# Build Docker image
+docker build -t productivesocial-selfmanager .
+
+# Run without Docker (uses .env)
+cd server && ../gradlew run
+# or directly:
+java -jar server/build/libs/server-all.jar
+```
+
+**Environment (`.env` in repo root):**
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=psocial_selfmanager
+DB_USER=postgres
+DB_PASSWORD=
+
+USER_REGISTRY_DB_HOST=localhost
+USER_REGISTRY_DB_PORT=5432
+USER_REGISTRY_DB_NAME=psocial_selfmanager
+USER_REGISTRY_DB_USER=postgres
+USER_REGISTRY_DB_PASSWORD=
+
+PORT=1226
+HOST=0.0.0.0
+JWT_SECRET=your-super-secret-jwt-secret-key-change-in-production
+JWT_ISSUER=ktor-psocial-app
+JWT_AUDIENCE=ktor-psocial
+JWT_REALM=ktor-psocial
+INTERNAL_API_KEY=psocial-internal-secret
+BILLING_SERVICE_URL=http://localhost:1229
+TIMER_SERVICE_URL=http://localhost:1227
+ALLOWED_ORIGINS=*
+```
+
+---
+
+### 2. psocial_timer (Kotlin/Ktor :1227)
+
+```bash
+cd psocial_timer
+
+# Compile fat JAR
+./gradlew :server:shadowJar
+# Output: server/build/libs/server-all.jar
+
+# Build Docker image
+docker build -t productivesocial-timer .
+
+# Run without Docker
+java -jar server/build/libs/server-all.jar
+```
+
+**Environment (`.env`):**
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=psocial_timer
+DB_USER=postgres
+DB_PASSWORD=
+
+USER_REGISTRY_DB_HOST=localhost
+USER_REGISTRY_DB_PORT=5432
+USER_REGISTRY_DB_NAME=psocial_selfmanager
+USER_REGISTRY_DB_USER=postgres
+USER_REGISTRY_DB_PASSWORD=
+
+PORT=1227
+HOST=0.0.0.0
+JWT_SECRET=your-super-secret-jwt-secret-key-change-in-production
+JWT_ISSUER=ktor-psocial-app
+JWT_AUDIENCE=ktor-psocial
+JWT_REALM=ktor-psocial
+INTERNAL_API_KEY=psocial-internal-secret
+SELFMANAGER_SERVICE_URL=http://localhost:1226
+ALLOWED_ORIGINS=*
+```
+
+---
+
+### 3. psocial_analytics (Kotlin/Ktor :1228)
+
+```bash
+cd psocial_analytics
+
+# Compile fat JAR
+./gradlew :server:shadowJar
+# Output: server/build/libs/server-all.jar
+
+# Build Docker image
+docker build -t productivesocial-analytics .
+
+# Run without Docker
+java -jar server/build/libs/server-all.jar
+```
+
+**Environment (`.env`):**
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=psocial_analytics
+DB_USER=postgres
+DB_PASSWORD=
+
+PORT=1228
+HOST=0.0.0.0
+JWT_SECRET=your-super-secret-jwt-secret-key-change-in-production
+JWT_ISSUER=ktor-psocial-app
+JWT_AUDIENCE=ktor-psocial
+JWT_REALM=ktor-psocial
+INTERNAL_API_KEY=psocial-internal-secret
+SELFMANAGER_SERVICE_URL=http://localhost:1226
+TIMER_SERVICE_URL=http://localhost:1227
+BILLING_SERVICE_URL=http://localhost:1229
+ADMIN_EMAILS=admin@productivesocial.com
+ALLOWED_ORIGINS=*
+```
+
+---
+
+### 4. psocial_billing (Python/FastAPI :1229)
+
+```bash
+cd psocial_billing
+
+# Create and activate virtualenv
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run database migrations
+alembic upgrade head
+
+# Run dev server
+uvicorn app.main:app --host 0.0.0.0 --port 1229 --reload
+
+# Build Docker image
+docker build -t productivesocial-billing .
+```
+
+**Environment (`.env`):**
+```env
+APP_ENV=development
+DATABASE_URL=postgresql+asyncpg://postgres@localhost:5432/psocial_billing
+DATABASE_URL_SYNC=postgresql://postgres@localhost:5432/psocial_billing
+
+JWT_SECRET_KEY=your-super-secret-jwt-secret-key-change-in-production
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+INTERNAL_API_KEY=psocial-internal-secret
+SELFMANAGER_BASE_URL=http://localhost:1226
+DEFAULT_CREDITS_ON_REGISTER=100
+
+# LLM — choose one provider
+DEFAULT_LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
+
+# ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+```
+
+---
+
+### 5. psocial_dashboard — Admin (Streamlit :1230)
+
+```bash
+cd psocial_dashboard
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run locally
+streamlit run app.py --server.port 1230
+
+# Build Docker image
+docker build -t productivesocial-dashboard .
+```
+
+**Environment (`.env` or shell):**
+```env
+BILLING_URL=http://localhost:1229
+SELFMANAGER_URL=http://localhost:1226
+ANALYTICS_URL=http://localhost:1228
+PORT=1230
+```
+
+---
+
+### 6. psocial_user_dashboard — User (Streamlit :1231)
+
+```bash
+cd psocial_user_dashboard
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run locally
+streamlit run app.py --server.port 1231
+
+# Build Docker image
+docker build -t productivesocial-user-dashboard .
+```
+
+**Environment (`.env` or shell):**
+```env
+BILLING_URL=http://localhost:1229
+SELFMANAGER_URL=http://localhost:1226
+ANALYTICS_URL=http://localhost:1228
+TIMER_URL=http://localhost:1227
+PORT=1231
+```
+
+---
+
+### Build All & Run via Docker Compose
+
+Build all images in one go (from the directory containing `docker-compose.yml`):
+
+```bash
+# Step 1 — compile all Kotlin JARs
+cd psocial_selfmanager  && ./gradlew :server:shadowJar && cd ..
+cd psocial_timer        && ./gradlew :server:shadowJar && cd ..
+cd psocial_analytics    && ./gradlew :server:shadowJar && cd ..
+
+# Step 2 — build all Docker images
+docker build -t productivesocial-selfmanager   ./psocial_selfmanager
+docker build -t productivesocial-timer         ./psocial_timer
+docker build -t productivesocial-analytics     ./psocial_analytics
+docker build -t productivesocial-billing       ./psocial_billing
+docker build -t productivesocial-dashboard     ./psocial_dashboard
 docker build -t productivesocial-user-dashboard ./psocial_user_dashboard
+
+# Step 3 — start everything
+docker-compose up -d
 ```
 
-### Run Everything Locally
+### Useful Docker Compose Commands
 
 ```bash
-# From the repo root (where docker-compose.yml lives)
-docker-compose up
+docker-compose up -d                  # start all in background
+docker-compose down                   # stop and remove containers
+docker-compose logs -f <service>      # tail logs (e.g. analytics, billing)
+docker-compose up -d <service>        # restart a single service
+docker-compose ps                     # check container status
+
+# Rebuild a single service after code change
+docker build -t productivesocial-billing ./psocial_billing && docker-compose up -d billing
 ```
 
-> Note: Kotlin images must be built (JAR compiled + `docker build`) before `docker-compose up` will work, as the compose file references pre-built images via `image:`.
+### Rebuild a Single Kotlin Service
+
+```bash
+# Example: rebuild selfmanager after a code change
+cd psocial_selfmanager
+./gradlew :server:shadowJar
+cd ..
+docker build -t productivesocial-selfmanager ./psocial_selfmanager
+docker-compose up -d selfmanager
+```
+
+> **Note:** The `docker-compose.yml` references pre-built images via `image:` — not `build:`. Always compile the JAR and build the Docker image before running compose for Kotlin services.
 
 ---
 
