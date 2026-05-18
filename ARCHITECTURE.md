@@ -105,6 +105,7 @@ docker build -t productivesocial-user-dashboard ./psocial_user_dashboard
 ### Run Everything Locally
 
 ```bash
+# From the repo root (where docker-compose.yml lives)
 docker-compose up
 ```
 
@@ -114,12 +115,13 @@ docker-compose up
 
 ## Docker Setup
 
-All services run via Docker Compose (`docker-compose.yml` in the project root).
+`docker-compose.yml` is tracked in this repo. All services run on a shared `psocial_network` bridge network so containers reference each other by service name (e.g. `http://selfmanager:1226`).
 
 ```
-docker-compose up --build   # build and start everything
+docker-compose up           # start everything
 docker-compose down         # stop all services
 docker-compose logs -f <service>  # tail logs for a service
+docker-compose up -d <service>    # restart a single service
 ```
 
 Each Kotlin service uses a single-stage Dockerfile based on `eclipse-temurin:17-jre`, copying a pre-built `server-all.jar`.
@@ -128,6 +130,27 @@ Python services use `python:3.12-slim`.
 **Colima** is the recommended Docker runtime on macOS. Start with enough memory for Kotlin builds:
 ```
 colima start --memory 6 --cpu 4
+```
+
+### LLM — Local Ollama (default)
+
+The billing service defaults to **Ollama** with `llama3.2`. Docker containers reach the host's Ollama via `host.docker.internal:11434`.
+
+```
+# docker-compose.yml billing env
+DEFAULT_LLM_PROVIDER: ollama
+OLLAMA_BASE_URL: http://host.docker.internal:11434
+OLLAMA_MODEL: llama3.2
+```
+
+To switch to Anthropic or OpenAI, set `DEFAULT_LLM_PROVIDER` and the corresponding API key env var (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) in a root `.env` file.
+
+### Analytics Admin Access
+
+The analytics service uses an `ADMIN_EMAILS` env var (comma-separated) to gate admin routes. Set it in `docker-compose.yml` or a root `.env`:
+
+```
+ADMIN_EMAILS=admin@productivesocial.com
 ```
 
 ---
