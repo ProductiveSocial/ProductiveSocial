@@ -8,7 +8,7 @@ Users track their work (tasks, habits, routines, focus sessions), and the system
 
 ## Services
 
-### `psocial_selfmanager` (Kotlin/Ktor, port 8080)
+### `psocial_selfmanager` (Kotlin/Ktor, port 1226)
 The core user-facing service. Manages:
 - **Users** — identified by email only, no password
 - **Tasks** — with priority, time tracking, completion logs
@@ -18,7 +18,7 @@ The core user-facing service. Manages:
 
 Exposes internal endpoints so `psocial_analytics` can pull per-user data.
 
-### `psocial_timer` (Kotlin/Ktor, port 8081)
+### `psocial_timer` (Kotlin/Ktor, port 1227)
 Pomodoro focus session tracker. Records work/break cycles linked to tasks, habits, or routines. Exposes an internal endpoint so analytics can pull per-user stats.
 
 **AI features built into the timer (Features 1–5):**
@@ -28,7 +28,7 @@ Pomodoro focus session tracker. Records work/break cycles linked to tasks, habit
 - **Entity-specific analysis** — `GET /insights/entity-stats` returns session completion rates, avg work minutes, and avg cycles broken down by Task, Habit, Routine, and Standalone. Identifies strongest and weakest entity types.
 - **Adaptive break suggestions** — `POST /sessions/{id}/intervals/{intervalId}/complete` response includes a `suggestedNextBreak` field (ShortBreak, LongBreak, or ExtendedRest) whenever a Work interval is completed.
 
-### `psocial_analytics` (Kotlin/Ktor, port 8082)
+### `psocial_analytics` (Kotlin/Ktor, port 1228)
 AI analysis service. Pulls data from selfmanager and timer, sends it to billing for LLM inference, stores the resulting insight, and presents reports to users and admins.
 - Regular users can trigger analysis and read their own reports
 - Admins can view all users' reports and aggregate stats
@@ -43,14 +43,14 @@ AI analysis service. Pulls data from selfmanager and timer, sends it to billing 
 | `WEEKLY_TIMER_SUMMARY` | AI-generated weekly Pomodoro recap — focus time, completion rate, peak patterns, next-week suggestion |
 | `CUSTOM` | Free-form prompt |
 
-### `psocial_billing_service` (Python/FastAPI, port 8001)
+### `psocial_billing` (Python/FastAPI, port 1229)
 Handles:
 - **Credits** — users have a balance, AI calls cost credits
 - **ML models** — register scikit-learn (`.pkl`) or LLM models
 - **Predictions** — run sklearn inference or call Ollama/Claude/OpenAI, deduct credits
 - **Transactions** — full audit log of credit charges/refunds
 
-### `psocial_dashboard` (Streamlit, port 8501)
+### `psocial_dashboard` (Streamlit, port 1230)
 **Admin UI.** Login restricted to users with `is_admin=true`. Pages:
 - **Overview** — system-wide billing stats (users, predictions, credits charged/deposited, active models)
 - **Users** — list all users, activate/deactivate, top up credits
@@ -58,7 +58,7 @@ Handles:
 - **Predictions** — view all predictions system-wide
 - **Analytics** — view all AI reports by type and by user, delete user reports
 
-### `psocial_user_dashboard` (Streamlit, port 8502)
+### `psocial_user_dashboard` (Streamlit, port 1231)
 **User UI.** Login open to any registered user. Pages:
 - **Productivity** — view tasks, habits, and routines from selfmanager
 - **Focus** — two tabs:
@@ -66,6 +66,49 @@ Handles:
   - *Insights* — recommended durations, focus pattern charts (by hour/day), entity completion rates, weekly summary generator
 - **Analysis** — trigger AI analysis (all types), view previous reports
 - **Credits** — current balance, email, and transaction history
+
+---
+
+## Build Steps
+
+### Kotlin Services (selfmanager, timer, analytics)
+
+Each Kotlin service must be compiled into a fat JAR before its Docker image can be built.
+
+```bash
+# selfmanager
+cd psocial_selfmanager && ./gradlew :server:shadowJar
+
+# timer
+cd psocial_timer && ./gradlew :server:shadowJar
+
+# analytics
+cd psocial_analytics && ./gradlew :server:shadowJar
+```
+
+Output: `server/build/libs/server-all.jar` (picked up by the Dockerfile)
+
+### Build Docker Images
+
+```bash
+# Kotlin services
+docker build -t productivesocial-selfmanager ./psocial_selfmanager
+docker build -t productivesocial-timer ./psocial_timer
+docker build -t productivesocial-analytics ./psocial_analytics
+
+# Python services
+docker build -t productivesocial-billing ./psocial_billing
+docker build -t productivesocial-dashboard ./psocial_dashboard
+docker build -t productivesocial-user-dashboard ./psocial_user_dashboard
+```
+
+### Run Everything Locally
+
+```bash
+docker-compose up
+```
+
+> Note: Kotlin images must be built (JAR compiled + `docker build`) before `docker-compose up` will work, as the compose file references pre-built images via `image:`.
 
 ---
 
@@ -79,7 +122,7 @@ docker-compose down         # stop all services
 docker-compose logs -f <service>  # tail logs for a service
 ```
 
-Each Kotlin service uses a multi-stage Dockerfile: Gradle build stage → `eclipse-temurin:17-jre` runtime.
+Each Kotlin service uses a single-stage Dockerfile based on `eclipse-temurin:17-jre`, copying a pre-built `server-all.jar`.
 Python services use `python:3.12-slim`.
 
 **Colima** is the recommended Docker runtime on macOS. Start with enough memory for Kotlin builds:
@@ -133,17 +176,17 @@ User / Dashboard
 
 ```mermaid
 graph TD
-    UserDash([User Dashboard :8502])
-    AdminDash([Admin Dashboard :8501])
+    UserDash([User Dashboard :1231])
+    AdminDash([Admin Dashboard :1230])
 
     subgraph User-Facing
-        SM[selfmanager :8080]
-        TM[timer :8081]
+        SM[selfmanager :1226]
+        TM[timer :1227]
     end
 
     subgraph AI / Billing
-        AN[analytics :8082]
-        BL[billing :8001]
+        AN[analytics :1228]
+        BL[billing :1229]
     end
 
     subgraph Databases
@@ -216,8 +259,8 @@ Each service owns its own PostgreSQL database. No shared tables — services onl
 | Service      | Container              | Host Port |
 |--------------|------------------------|-----------|
 | selfmanager  | psocial_selfmanager_db | 5432      |
-| billing      | psocial_billing_db     | 5433      |
 | timer        | psocial_timer_db       | 5434      |
+| billing      | psocial_billing_db     | 5433      |
 | analytics    | psocial_analytics_db   | 5435      |
 
 ---
