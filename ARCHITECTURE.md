@@ -76,7 +76,7 @@ All billing calls from the admin dashboard use the `X-Internal-Key` header direc
 
 The user dashboard is open to any registered user. Login uses selfmanager's email-only identify flow, and a single selfmanager JWT is all that's needed — no separate billing login.
 
-The dashboard has four sections: **Productivity** shows the user's tasks, habits, and routines pulled from selfmanager. **Focus** has two tabs — Sessions shows pomodoro settings, a session history table with status filters, and summary metrics; Insights shows recommended durations, focus pattern charts by hour and day of week, entity completion rate breakdowns, and a weekly AI summary generator. **Analysis** lets the user trigger any analysis type, select a model, and view all previous reports. **Credits** shows the current balance and full transaction history, all proxied through analytics.
+The dashboard has four sections: **Productivity** shows the user's tasks, habits, and routines pulled from selfmanager. **Focus** has two tabs — Sessions shows pomodoro settings, a session history table with status filters, and summary metrics; Insights shows recommended durations, focus pattern charts by hour and day of week, entity completion rate breakdowns, and a weekly AI summary generator. **Analysis** lets the user trigger any analysis type, select a model, and view all previous reports. **Credits** shows the current balance and transaction history, proxied through analytics. Users cannot deposit credits — that is an admin-only action performed via the admin dashboard.
 
 ---
 
@@ -541,7 +541,6 @@ User endpoints require a selfmanager/timer Bearer JWT. Admin endpoints additiona
 | `GET` | `/api/v1/analytics` | List the authenticated user's stored reports (newest first) |
 | `GET` | `/api/v1/credits/balance` | Current credit balance (proxied from billing) |
 | `GET` | `/api/v1/credits/transactions` | Paginated transaction history (proxied from billing) |
-| `POST` | `/api/v1/credits/deposit` | Deposit credits (proxied to billing) |
 | `GET` | `/api/v1/admin/stats` | Totals: users, reports, credits charged, breakdown by analysis type |
 | `GET` | `/api/v1/admin/users` | All users with report counts |
 | `GET` | `/api/v1/admin/reports` | All reports across all users |
@@ -621,6 +620,7 @@ Auth endpoints are unauthenticated. All data endpoints require a Bearer JWT — 
 | 5 | analytics | `GET /api/v1/analytics` | User reads their stored reports |
 | 5 | analytics | `GET /api/v1/credits/balance` | User sees current credit balance (proxied from billing) |
 | 5 | analytics | `GET /api/v1/credits/transactions` | User sees credit transaction history (proxied from billing) |
+| — | admin dashboard | Admin deposits credits via billing internal API | Credits added to user's account; users cannot deposit themselves |
 
 ---
 

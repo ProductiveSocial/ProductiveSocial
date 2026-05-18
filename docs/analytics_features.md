@@ -47,7 +47,8 @@ When a credit call comes in, the service extracts the authenticated user's `user
 
 - `GET /api/v1/credits/balance` — returns the user's current credit balance
 - `GET /api/v1/credits/transactions?limit=50&offset=0` — returns paginated transaction history (deposits, charges, refunds) with a running `credits_balance` field
-- `POST /api/v1/credits/deposit` — adds credits to the user's account; body is `{ "amount": Int, "description": String? }`
+
+Users cannot deposit credits themselves. Deposits are admin-only operations performed via the admin dashboard, which calls billing directly with an internal key.
 
 ---
 
