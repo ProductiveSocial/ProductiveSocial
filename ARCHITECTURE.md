@@ -320,53 +320,33 @@ PORT=1231
 
 ---
 
-### Build All & Run via Docker Compose
+### Running with Docker Compose
 
-Build all images in one go (from the directory containing `docker-compose.yml`):
+The `docker-compose.yml` uses pre-built images (`image:` not `build:`), so all images must exist locally before starting.
 
+**Step 1 — compile Kotlin JARs:**
 ```bash
-# Step 1 — compile all Kotlin JARs
 cd psocial_selfmanager  && ./gradlew :server:shadowJar && cd ..
 cd psocial_timer        && ./gradlew :server:shadowJar && cd ..
 cd psocial_analytics    && ./gradlew :server:shadowJar && cd ..
+```
 
-# Step 2 — build all Docker images
-docker build -t productivesocial-selfmanager   ./psocial_selfmanager
-docker build -t productivesocial-timer         ./psocial_timer
-docker build -t productivesocial-analytics     ./psocial_analytics
-docker build -t productivesocial-billing       ./psocial_billing
-docker build -t productivesocial-dashboard     ./psocial_dashboard
+**Step 2 — build all Docker images:**
+```bash
+docker build -t productivesocial-selfmanager    ./psocial_selfmanager
+docker build -t productivesocial-timer          ./psocial_timer
+docker build -t productivesocial-analytics      ./psocial_analytics
+docker build -t productivesocial-billing        ./psocial_billing
+docker build -t productivesocial-dashboard      ./psocial_dashboard
 docker build -t productivesocial-user-dashboard ./psocial_user_dashboard
+```
 
-# Step 3 — start everything
+**Step 3 — start everything:**
+```bash
 docker-compose up -d
 ```
 
-### Useful Docker Compose Commands
-
-```bash
-docker-compose up -d                  # start all in background
-docker-compose down                   # stop and remove containers
-docker-compose logs -f <service>      # tail logs (e.g. analytics, billing)
-docker-compose up -d <service>        # restart a single service
-docker-compose ps                     # check container status
-
-# Rebuild a single service after code change
-docker build -t productivesocial-billing ./psocial_billing && docker-compose up -d billing
-```
-
-### Rebuild a Single Kotlin Service
-
-```bash
-# Example: rebuild selfmanager after a code change
-cd psocial_selfmanager
-./gradlew :server:shadowJar
-cd ..
-docker build -t productivesocial-selfmanager ./psocial_selfmanager
-docker-compose up -d selfmanager
-```
-
-> **Note:** The `docker-compose.yml` references pre-built images via `image:` — not `build:`. Always compile the JAR and build the Docker image before running compose for Kotlin services.
+Services will be available at their respective ports. Databases start first (healthcheck gated), then services in dependency order.
 
 ---
 
