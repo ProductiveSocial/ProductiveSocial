@@ -119,13 +119,15 @@ User: `test@productivesocial.com`
 - ✅ 4 routines with steps (Morning, Deep Work, Evening Learning, Weekly Review)
 - ✅ 32 pomodoro sessions (31 completed) linked to tasks, habits, routines, and standalone
 - ✅ 55 habit completions across 14 days of history
-- ✅ AI analysis tested end-to-end (PRODUCTIVITY_SUMMARY via Ollama llama3.2)
+- ✅ AI analysis tested end-to-end locally (PRODUCTIVITY_SUMMARY via Ollama llama3.2)
+- ✅ AI analysis tested end-to-end on Render (via ngrok tunnel to local Ollama)
 
 ---
 
 ## Known Issues / Next Steps
 
 - 📋 Render selfmanager re-deploy (UserRegistry created_at fix — current prod fails on first login for new users)
+- ✅ AI analysis working end-to-end on Render via ngrok → local Ollama
 - 📋 Add ANTHROPIC_API_KEY / OPENAI_API_KEY to Render billing env vars for cloud LLM support
 - 📋 Admin Dashboard: make-admin UI, model CRUD, user search/filter, date range filters, CSV export
 - 📋 User Dashboard: task/habit/routine CRUD, live pomodoro timer, timer settings editor, report filtering
