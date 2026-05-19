@@ -122,27 +122,27 @@ The architecture of the system — four services today, eight when complete — 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        USER-FACING SERVICES                             │
 │                                                                         │
-│  ┌─────────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌──────────┐  │
-│  │selfmanager  │ │  timer   │ │analytics  │ │  user    │ │ journal  │  │
-│  │Kotlin/Ktor  │ │Kotlin/   │ │Kotlin/    │ │Kotlin/   │ │Kotlin/   │  │
-│  │             │ │Ktor      │ │Ktor       │ │Ktor      │ │Ktor      │  │
-│  │tasks habits │ │pomodoro  │ │AI analysis│ │profiles  │ │entries   │  │
-│  │routines     │ │sessions  │ │credit     │ │social    │ │mood      │  │
-│  │notes        │ │focus     │ │proxy      │ │graph     │ │AI synth  │  │
-│  │todo lists   │ │rooms     │ │           │ │          │ │          │  │
-│  │projects     │ │streaks   │ │           │ │          │ │          │  │
-│  │identity     │ │          │ │           │ │          │ │          │  │
-│  └──────┬──────┘ └────┬─────┘ └─────┬─────┘ └────┬─────┘ └────┬─────┘  │
+│  ┌─────────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌──────────┐   │
+│  │selfmanager  │ │  timer   │ │analytics  │ │  user    │ │ journal  │   │
+│  │Kotlin/Ktor  │ │Kotlin/   │ │Kotlin/    │ │Kotlin/   │ │Kotlin/   │   │
+│  │             │ │Ktor      │ │Ktor       │ │Ktor      │ │Ktor      │   │
+│  │tasks habits │ │pomodoro  │ │AI analysis│ │profiles  │ │entries   │   │
+│  │routines     │ │sessions  │ │credit     │ │social    │ │mood      │   │
+│  │notes        │ │focus     │ │proxy      │ │graph     │ │AI synth  │   │
+│  │todo lists   │ │rooms     │ │           │ │identity  │ │          │   │
+│  │projects     │ │streaks   │ │           │ │          │ │          │   │
+│  │             │ │          │ │           │ │          │ │          │   │
+│  └──────┬──────┘ └────┬─────┘ └─────┬─────┘ └────┬─────┘ └────┬─────┘   │
 │         │             │             │             │            │        │
-│     ┌───┴──┐      ┌───┴──┐     ┌───┴──┐     ┌───┴──┐    ┌───┴──┐     │
-│     │ DB   │      │ DB   │     │ DB   │     │ DB   │    │ DB   │     │
-│     └──────┘      └──────┘     └──────┘     └──────┘    └──────┘     │
+│     ┌───┴──┐      ┌───┴──┐     ┌───┴──┐     ┌───┴──┐    ┌───┴──┐        │
+│     │ DB   │      │ DB   │     │ DB   │     │ DB   │    │ DB   │        │
+│     └──────┘      └──────┘     └──────┘     └──────┘    └──────┘        │
 │                                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                     social                                       │   │
 │  │                  Kotlin/Ktor                                     │   │
-│  │   community feed · achievements · habit blueprints              │   │
-│  │   accountability partners · focus rooms · public profiles       │   │
+│  │   community feed · achievements · habit blueprints               │   │
+│  │   accountability partners · focus rooms · public profiles        │   │
 │  │                    ┌──────┐                                      │   │
 │  │                    │  DB  │                                      │   │
 │  │                    └──────┘                                      │   │
@@ -153,18 +153,18 @@ The architecture of the system — four services today, eight when complete — 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           INTERNAL SERVICE                              │
 │                                                                         │
-│              ┌───────────────────────────────────────┐                 │
-│              │               billing                 │                 │
-│              │            Python/FastAPI             │                 │
-│              │  credit ledger · LLM inference        │                 │
-│              │  model registry · sklearn pathway     │                 │
-│              │  trained behavioral models            │                 │
-│              └───────────────┬───────────────────────┘                 │
-│                              │                   ┌───────────────┐     │
-│                        ┌─────┴──────┐            │ LLM Providers │     │
-│                        │ billing_db │            │ Ollama/Claude │     │
-│                        └────────────┘            │ OpenAI / GPT  │     │
-│                                                  └───────────────┘     │
+│              ┌───────────────────────────────────────┐                  │
+│              │               billing                 │                  │
+│              │            Python/FastAPI             │                  │
+│              │  credit ledger · LLM inference        │                  │
+│              │  model registry · sklearn pathway     │                  │
+│              │  trained behavioral models            │                  │
+│              └───────────────┬───────────────────────┘                  │
+│                              │                   ┌───────────────┐      │
+│                        ┌─────┴──────┐            │ LLM Providers │      │
+│                        │ billing_db │            │ Ollama/Claude │      │
+│                        └────────────┘            │ OpenAI / GPT  │      │
+│                                                  └───────────────┘      │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
