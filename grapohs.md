@@ -1,32 +1,35 @@
-graph TD
-    %% Clients Layer
-    Clients["Clients<br/>- KMP (Android/iOS/Desktop)<br/>- Web App (planned)"]
-    Clients -->|JWT Bearer Tokens| Services
+sequenceDiagram
+    participant Client as CLIENTS
+    participant Services as USER-FACING SERVICES
+    participant Internal as INTERNAL SERVICE
+    participant Billing as BILLING (Python/FastAPI)
+    participant LLMs as LLM Providers
 
-    %% User-Facing Services
-    Services["User Services<br/>- Selfmanager<br/>- Timer<br/>- Analytics<br/>- User Profiles<br/>- Journal (planned)"]
-    Services -->|X-Internal-Key| Internal_API
+    %% Client initiates request
+    Client ->> Services: JWT (Bearer Token)
 
-    %% Databases for each service
-    Selfmanager_DB["Selfmanager DB"]
-    Timer_DB["Timer DB"]
-    Analytics_DB["Analytics DB"]
-    UserProfile_DB["User Profile DB"]
-    Journal_DB["Journal DB"]
-    Social_DB["Social Service DB"]
-    Services --> Selfmanager_DB
-    Services --> Timer_DB
-    Services --> Analytics_DB
-    Services --> UserProfile_DB
-    Services --> Journal_DB
-    %% Social Service
-    Social["Social Module<br/>- Community Feed<br/>- Achievements<br/>- Habit Blueprints<br/>- Accountability<br/>- Focus Rooms"]
-    Social --> Social_DB
+    %% User-facing services interact
+    Services ->> Selfmanager: Request tasks, habits, routines, notes, projects
+    Services ->> Timer: Request pomodoro sessions, focus rooms, streaks
+    Services ->> Analytics: Request AI analysis
+    Services ->> UserProfiles: Request profile data
+    Services ->> Journal: Request journal entries
 
-    %% Internal Microservice Layer
-    Internal_Service["Internal Services<br/>- Billing & ML inference<br/>- Credit Ledger<br/>- Model Registry<br/>- Behavior Models"]
-    Internal_Service -->|API Calls| Billing_Providers
+    %% Internal Service interactions
+    Services ->> Internal: X-Internal-Key (service-to-service request)
+    Internal ->> Billing: Request credit ledger, LLM inference, model registry
+    Billing ->> LLMs: Invoke LLM provider (Ollama, Claude, GPT)
+    LLMs -->> Billing: Return inference results
+    Billing -->> Internal: Return AI analysis, update credit ledger
+    Internal -->> Services: Send processed data / responses
 
-    %% LLM Providers
-    Billing_Providers["LLM Providers<br/>- Ollama<br/>- Claude<br/>- OpenAI/GPT"]
-    Internal_Service --> Billing_Providers
+    %% Data persists in respective databases
+    Selfmanager -->> Selfmanager DB: Store tasks, habits, routines, notes, projects
+    Timer -->> Timer DB: Store pomodoro sessions, streaks, focus rooms
+    Analytics -->> Analytics DB: Store AI reports
+    UserProfiles -->> User Profile DB
+    Journal -->> Journal DB
+    Social -->> Social DB
+
+    %% Final response to client
+    Services -->> Client: AI analysis report / data
