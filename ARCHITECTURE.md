@@ -666,3 +666,94 @@ LLMs handle open-ended productivity analysis without labeled datasets. The billi
 | OpenAI GPT-4o | Paid | API key | High quality |
 
 The sklearn model support stays in the architecture as a deliberate slot — when sufficient data exists, a trained model can be plugged in via the `/models` upload endpoint with no changes to the rest of the system.
+
+---
+
+## PS_kmp — Kotlin Multiplatform Client
+
+### What It Is
+
+PS_kmp is the mobile and desktop client for ProductiveSocial. It targets Android, iOS, and JVM Desktop from a single shared codebase using Compose Multiplatform for UI. The app is offline-first: all data is written to a local SQLite database via SQLDelight before any server communication, so it works fully without a network connection.
+
+---
+
+### Architecture
+
+**Pattern:** MVVM + Repository + Koin dependency injection
+
+```
+Screen (Composable)
+  └── ViewModel (state + business logic)
+        └── Repository (interface)
+              ├── SqlDelightRepository (local SQLite)
+              └── InMemoryRepository (mock/test)
+```
+
+Network sync runs as a separate layer on top of local repos. The `SyncRepository` batches pending creates, updates, and deletes and posts them to the backend. Server-assigned IDs are mapped back to local rows via `serverId` columns.
+
+---
+
+### Modules
+
+| Package | Contents |
+|---|---|
+| `tasks` | Tasks, Habits, Routines, Projects — screens, ViewModels, SQLDelight repos, entity mappers |
+| `pomodoro` | Pomodoro timer, focus sessions, settings, statistics |
+| `journal` | Journal screen (UI scaffold only — data layer not yet wired) |
+| `userPage` | User profile, InsightsViewModel, analytics report display (in progress) |
+| `navigation` | Type-safe `Routes` sealed interface, NavHost, NavScaffold, bottom nav + side rail |
+| `network` | ServicesApiClient (with JWT refresh interceptor), TimerApiClient, AnalyticsApiClient, SyncRepository, NetworkMonitor |
+| `notifications` | `expect`/`actual` NotificationScheduler — Android/iOS schedule OS reminders; JVM is a no-op stub |
+| `database` | PSocialDb singleton, platform-specific SQLDelight drivers |
+| `di` | Koin AppModule — repos, ViewModels, API clients, `onTokensRefreshed` callback wiring |
+| `styling` | Colors, Typography, Spacing, Shapes, theme composable |
+| `uicomponents` | 24 shared composables (buttons, chips, cards, pickers, empty states) |
+
+---
+
+### Key Behaviours
+
+**Authentication** — Email-only, no password. `POST /api/v1/auth/identify` returns a JWT + refresh token. Both are stored in the `sync_metadata` table and restored on every launch by `UserSessionManager.init()`. On a 401 response, `ServicesApiClient` automatically calls `POST /api/v1/auth/refresh` via a separate plain HttpClient (avoids interceptor recursion), updates `AppSession` in-memory, persists the new pair via an `onTokensRefreshed` callback to `UserSessionManager`, and retries the original request. A `Mutex` prevents concurrent 401s from triggering multiple refresh calls. If the refresh itself fails, the 401 propagates (re-login required). Logout wipes all local user data.
+
+**Offline Sync** — Every entity gets a client-generated UUID (`syncId`) at creation. Sync batches all pending creates/updates/deletes in one call and returns `idMappings` (client UUID → server integer ID), `serverChanges` (changes from other devices since `lastSyncedAt`), per-item `errors`, and a new `syncedAt` timestamp. Pomodoro sessions sync separately to the timer service. `App.kt` triggers a re-sync automatically when network connectivity is restored (false→true transition via `NetworkMonitor`).
+
+**Per-date Completion** — Habits and routines track completion per calendar date, not as a global boolean. SQLDelight queries use `combine` across the entity table and a `_completion` table so the UI reacts to completion changes without re-querying the entity. Logging a habit on one day never blocks logging it on another. A future-date guard hides "Log as completed" buttons and disables toggles when `selectedDate > today`.
+
+**Notifications** — `NotificationScheduler` is an `expect`/`actual` interface: Android and iOS schedule OS-level reminders; JVM Desktop is a no-op stub. Task, Habit, and Routine ViewModels call `scheduleItemReminders` / `cancelItemReminders` on every create, update, and delete. `UserTask.reminderTimes` is a `@Transient` computed property that derives actual fire times from stored `reminderOptions` labels and task times at runtime.
+
+**AI / Fill with AI** — NLP sheets expose a `modelReady: StateFlow<Boolean?>` state machine: `null` = checking (shows disabled "Generate"), `false` = unavailable (shows "AI model is unavailable" + Retry button), `true` = ready (Generate enabled). Each ViewModel exposes `recheckModelStatus()` for the Retry action.
+
+**Pomodoro** — Full session lifecycle: Work → ShortBreak or LongBreak (based on cycle count and `cyclesUntilLongBreak`). Sessions can be standalone or linked to a Task, Habit, or Routine. `FocusViewModel` surfaces the linked entity's subtasks for in-session checking. After a Work interval completes, the screen shows a dismissable break suggestion card. Pausing surfaces a dismissable abandonment risk banner when the user's personal threshold is reached. After completion, a time-log is pushed to selfmanager via the timer service (fire-and-forget).
+
+**Responsive Layout** — `WindowSize` drives adaptive navigation: bottom bar on phones, side rail on tablets and desktop.
+
+---
+
+### Platform Details
+
+| Platform | SQLDelight Driver | Ktor Engine | Entry Point |
+|---|---|---|---|
+| Android | AndroidSqliteDriver | OkHttp | MainActivity + PSocialApplication |
+| iOS | NativeSqliteDriver | Darwin | MainViewController (called from Swift iosApp) |
+| JVM Desktop | JdbcSqliteDriver | Java | main.kt in jvmMain |
+
+Local dev base URLs: selfmanager `1226`, timer `1227`, analytics `1228`. Android emulator uses `10.0.2.2` as the localhost bridge; iOS and Desktop use `localhost`.
+
+---
+
+### How PS_kmp Connects to the Backend
+
+PS_kmp talks only to selfmanager, timer, and analytics — never to billing directly (billing is internal-only).
+
+```
+PS_kmp
+  ├── JWT ──▶ POST /api/v1/auth/identify        selfmanager  (login / account create)
+  ├── JWT ──▶ POST /api/v1/sync                 selfmanager  (tasks, habits, routines, projects)
+  ├── JWT ──▶ POST /api/v1/auth/identify        timer        (timer login, same user ID via UserRegistry)
+  ├── JWT ──▶ POST /api/v1/pomodoro/sync        timer        (sessions + intervals)
+  ├── JWT ──▶ PUT  /api/v1/pomodoro/settings    timer        (settings push)
+  ├── JWT ──▶ POST /api/v1/analytics            analytics    (trigger AI analysis)
+  ├── JWT ──▶ GET  /api/v1/analytics            analytics    (list stored reports)
+  ├── JWT ──▶ GET  /api/v1/credits/balance      analytics    (credit balance, proxied from billing)
+  └── JWT ──▶ GET  /api/v1/credits/transactions analytics    (transaction history, proxied from billing)
+```
